@@ -8,6 +8,16 @@
    {
      videoFile: File | null,               // The raw user-uploaded video File object
      videoUrl: string | null,              // Blob URL (URL.createObjectURL) for video element playback
+     video: {                              // Unified alias object for downstream developers
+       file: File | null,
+       url: string | null,
+       name: string,
+       duration: number,
+       width: number,
+       height: number,
+       resolution: string,
+       sizeFormatted: string
+     } | null,
      metadata: {
        name: string,                       // e.g. "DJI_0042_SURVEY.MP4"
        sizeBytes: number,                  // e.g. 48291040
@@ -29,6 +39,20 @@
        width: number,
        height: number
      }>,
+     telemetry: Array<{                    // Real GPS & altitude telemetry parsed from .SRT sidecar if provided
+       timeSec: number,
+       latitude: number,
+       longitude: number,
+       altitudeM: number,
+       raw: string
+     }>,
+     config: {                             // Ingestion flags read by Dev 3
+       processingMode: string,             // 'standard' | 'high-accuracy' | 'tactical-fast'
+       gaussianDensity: string,            // 'standard' | 'ultra-8.3m'
+       dynamicMasking: boolean,            // SAM2 dynamic object masking
+       gtsamOptimization: boolean,         // iSAM2 pose-graph refinement
+       siteIdentifier: string
+     },
      pipeline: {
        isProcessing: boolean,
        isCompleted: boolean,
@@ -51,8 +75,17 @@
 const initialAppState = {
   videoFile: null,
   videoUrl: null,
+  video: null,
   metadata: null,
   frames: [],
+  telemetry: [],
+  config: {
+    processingMode: 'high-accuracy',
+    gaussianDensity: 'ultra-8.3m',
+    dynamicMasking: true,
+    gtsamOptimization: true,
+    siteIdentifier: 'ALPHA_RECON_SECTOR_04',
+  },
   pipeline: {
     isProcessing: false,
     isCompleted: false,
@@ -91,11 +124,33 @@ export function getAppState() {
  */
 export function setAppState(updater) {
   const partial = typeof updater === 'function' ? updater(state) : updater;
+  
+  // Maintain convenient video alias if metadata or videoUrl updated
+  let videoObj = partial.video !== undefined ? partial.video : state.video;
+  if (partial.metadata || partial.videoUrl || partial.videoFile) {
+    const meta = partial.metadata || state.metadata;
+    const url = partial.videoUrl || state.videoUrl;
+    const file = partial.videoFile || state.videoFile;
+    if (meta && url) {
+      videoObj = {
+        file,
+        url,
+        name: meta.name,
+        duration: meta.durationSec,
+        width: meta.width,
+        height: meta.height,
+        resolution: meta.resolution,
+        sizeFormatted: meta.formattedSize,
+      };
+    }
+  }
+
   state = {
     ...state,
     ...partial,
-    // Deep merge nested objects if provided
+    video: videoObj,
     metadata: partial.metadata !== undefined ? partial.metadata : state.metadata,
+    config: partial.config !== undefined ? { ...state.config, ...partial.config } : state.config,
     pipeline: partial.pipeline !== undefined ? { ...state.pipeline, ...partial.pipeline } : state.pipeline,
   };
 
@@ -132,6 +187,7 @@ export function resetAppState() {
   }
   return setAppState({
     ...initialAppState,
+    config: { ...initialAppState.config },
     pipeline: { ...initialAppState.pipeline, logs: [] },
   });
 }

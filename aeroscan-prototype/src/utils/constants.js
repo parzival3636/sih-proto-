@@ -24,6 +24,14 @@ export const SYSTEM_BENCHMARKS = {
   supportedSensors: 'RGB Monocular (4K / 1080p), EO/IR, Multi-spectral',
 };
 
+export const DASHBOARD_STATS = {
+  totalMissions: 47,
+  modelsGenerated: 42,
+  avgProcessingTimeMin: 14.8,
+  avgAccuracyRmseCm: 2.1,
+};
+
+
 // Past mission telemetry for the historical dashboard table
 export const MISSIONS_HISTORY = [
   {

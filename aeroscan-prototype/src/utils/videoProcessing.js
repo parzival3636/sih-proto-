@@ -231,3 +231,84 @@ export async function extractFrames(videoSource, count = 8, maxDimension = 640, 
 
   return extracted;
 }
+
+/**
+ * Parse a DJI .SRT telemetry subtitle file to extract real GPS trajectory,
+ * altitude, and timestamp records.
+ * 
+ * @param {string} srtText - Content of the .SRT file
+ * @returns {Array<{ timeSec: number, latitude: number, longitude: number, altitudeM: number, raw: string }>}
+ */
+export function parseSrtTelemetry(srtText) {
+  if (!srtText || typeof srtText !== 'string') return [];
+
+  const entries = [];
+  const blocks = srtText.split(/\r?\n\r?\n/);
+
+  for (const block of blocks) {
+    if (!block.trim()) continue;
+
+    const lines = block.split(/\r?\n/);
+    if (lines.length < 2) continue;
+
+    // Parse timecode line: e.g. 00:00:01,500 --> 00:00:01,533
+    const timeMatch = lines[1]?.match(/(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/);
+    let timeSec = 0;
+    if (timeMatch) {
+      const h = parseInt(timeMatch[1], 10);
+      const m = parseInt(timeMatch[2], 10);
+      const s = parseInt(timeMatch[3], 10);
+      const ms = parseInt(timeMatch[4], 10);
+      timeSec = h * 3600 + m * 60 + s + ms / 1000;
+    }
+
+    const payload = lines.slice(2).join(' ');
+
+    // Match latitude & longitude patterns
+    // Pattern 1: [latitude: 11.685429] [longitude: 76.132891]
+    // Pattern 2: GPS (76.132891, 11.685429, 45.2M)
+    let lat = null;
+    let lon = null;
+    let alt = 0;
+
+    const latMatch = payload.match(/latitude\s*[:=]\s*([+-]?\d+\.?\d*)/i);
+    const lonMatch = payload.match(/longitude\s*[:=]\s*([+-]?\d+\.?\d*)/i);
+    const altMatch = payload.match(/(?:rel_alt|altitude|alt)\s*[:=]\s*([+-]?\d+\.?\d*)/i);
+
+    if (latMatch && lonMatch) {
+      lat = parseFloat(latMatch[1]);
+      lon = parseFloat(lonMatch[1]);
+      if (altMatch) alt = parseFloat(altMatch[1]);
+    } else {
+      // Pattern 2: GPS(lon, lat, alt) or GPS (lat, lon)
+      const gpsMatch = payload.match(/GPS\s*\(\s*([+-]?\d+\.?\d*)\s*,\s*([+-]?\d+\.?\d*)(?:\s*,\s*([+-]?\d+\.?\d*))?/i);
+      if (gpsMatch) {
+        // DJI usually orders (lon, lat) in GPS string or (lat, lon)
+        const v1 = parseFloat(gpsMatch[1]);
+        const v2 = parseFloat(gpsMatch[2]);
+        // Simple heuristic: latitude is within [-90, 90]
+        if (Math.abs(v1) <= 90 && Math.abs(v2) > 90) {
+          lat = v1; lon = v2;
+        } else if (Math.abs(v2) <= 90 && Math.abs(v1) > 90) {
+          lon = v1; lat = v2;
+        } else {
+          lat = v1; lon = v2;
+        }
+        if (gpsMatch[3]) alt = parseFloat(gpsMatch[3]);
+      }
+    }
+
+    if (lat !== null && lon !== null && !isNaN(lat) && !isNaN(lon)) {
+      entries.push({
+        timeSec: Number(timeSec.toFixed(2)),
+        latitude: lat,
+        longitude: lon,
+        altitudeM: Number(alt.toFixed(1)),
+        raw: payload,
+      });
+    }
+  }
+
+  return entries;
+}
+
