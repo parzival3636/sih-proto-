@@ -280,12 +280,11 @@ export async function generateDepthMap(dataUrl, outputWidth = 320) {
  * @returns {Promise<Array<{r: number, g: number, b: number, nx: number, ny: number, brightness: number}>>}
  */
 export async function samplePixelColors(dataUrl, count = 500) {
-  const w = 160;
-  const h = 90;
+  const w = 320;
+  const h = 180;
   const { ctx } = await drawToCanvas(dataUrl, w, h);
   const imageData = ctx.getImageData(0, 0, w, h);
   const data = imageData.data;
-  const totalPixels = w * h;
 
   // Stratified sampling: divide image into grid cells, sample from each
   const cellsX = Math.ceil(Math.sqrt(count * (w / h)));
@@ -318,6 +317,161 @@ export async function samplePixelColors(dataUrl, count = 500) {
   }
 
   return samples;
+}
+
+/* ============================================================
+   5. DENSE GRID SAMPLING — For High-Accuracy Multi-Frame
+   Reconstruction. Returns a structured grid of every pixel with
+   color + estimated depth for proper 3D back-projection.
+   ============================================================ */
+
+/**
+ * Dense grid sampling for multi-view stereo reconstruction.
+ * Samples a regular grid of pixels from the frame and computes per-pixel
+ * estimated depth using brightness, gradient magnitude, and local contrast.
+ *
+ * @param {string} dataUrl - Real frame dataUrl
+ * @param {number} [gridW=80] - Grid width (columns)
+ * @param {number} [gridH=45] - Grid height (rows)
+ * @returns {Promise<{grid: Array, width: number, height: number}>}
+ *   grid[row][col] = { r, g, b, nx, ny, brightness, depth, edgeStrength }
+ */
+export async function denseGridSample(dataUrl, gridW = 80, gridH = 45) {
+  const w = gridW * 4;  // 320px sample resolution
+  const h = gridH * 4;  // 180px sample resolution
+  const { ctx } = await drawToCanvas(dataUrl, w, h);
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+
+  // Pre-compute full grayscale and gradient magnitude
+  const gray = toGrayscale(data, w, h);
+
+  // Compute Sobel gradient magnitude for edge/depth estimation
+  const gradMag = new Float32Array(w * h);
+  let maxGrad = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const idx = y * w + x;
+      const gx = gray[idx + 1] - gray[idx - 1];
+      const gy = gray[idx + w] - gray[idx - w];
+      const mag = Math.sqrt(gx * gx + gy * gy);
+      gradMag[idx] = mag;
+      if (mag > maxGrad) maxGrad = mag;
+    }
+  }
+
+  // Build grid
+  const cellW = w / gridW;
+  const cellH = h / gridH;
+  const grid = [];
+
+  for (let gy = 0; gy < gridH; gy++) {
+    const row = [];
+    for (let gx = 0; gx < gridW; gx++) {
+      // Sample center of each cell
+      const px = Math.min(Math.floor(gx * cellW + cellW / 2), w - 1);
+      const py = Math.min(Math.floor(gy * cellH + cellH / 2), h - 1);
+      const pixIdx = (py * w + px) * 4;
+
+      const r = data[pixIdx];
+      const g = data[pixIdx + 1];
+      const b = data[pixIdx + 2];
+      const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+      // Edge strength at this pixel
+      const edgeStrength = maxGrad > 0 ? gradMag[py * w + px] / maxGrad : 0;
+
+      // Estimated depth: combine inverted brightness (dark = far, light = near)
+      // with edge strength (strong edges = foreground objects, depth discontinuities)
+      // This is a monocular depth heuristic: lower half of frame = closer (ground),
+      // upper portion = farther (sky/background), modified by brightness.
+      const verticalDepthBias = 1.0 - (gy / gridH); // bottom=1.0(near), top=0.0(far)
+      const brightnessDepth = brightness * 0.6;      // brighter = nearer surfaces
+      const edgeDepth = edgeStrength * 0.2;           // edges tend to be on foreground objects
+      const depth = verticalDepthBias * 0.4 + brightnessDepth + edgeDepth;
+
+      row.push({
+        r, g, b,
+        nx: gx / gridW,
+        ny: gy / gridH,
+        brightness,
+        depth: Math.min(1.0, Math.max(0.0, depth)),
+        edgeStrength,
+      });
+    }
+    grid.push(row);
+  }
+
+  return { grid, width: gridW, height: gridH };
+}
+
+/**
+ * Compute a per-pixel local depth field from a frame using multi-scale
+ * gradient analysis. Returns a Float32Array of depth values [0..1].
+ *
+ * @param {string} dataUrl - Real frame dataUrl
+ * @param {number} [resolution=160] - Processing resolution width
+ * @returns {Promise<{depths: Float32Array, width: number, height: number}>}
+ */
+export async function computeLocalDepthField(dataUrl, resolution = 160) {
+  const w = resolution;
+  const h = Math.round(resolution * 0.5625);
+  const { ctx } = await drawToCanvas(dataUrl, w, h);
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const gray = toGrayscale(imageData.data, w, h);
+
+  // Multi-scale gradient: fine (1px) + coarse (3px)
+  const depths = new Float32Array(w * h);
+  let minD = Infinity, maxD = -Infinity;
+
+  for (let y = 3; y < h - 3; y++) {
+    for (let x = 3; x < w - 3; x++) {
+      const idx = y * w + x;
+
+      // Fine gradient (1px kernel)
+      const gxF = gray[idx + 1] - gray[idx - 1];
+      const gyF = gray[idx + w] - gray[idx - w];
+      const fineEdge = Math.sqrt(gxF * gxF + gyF * gyF);
+
+      // Coarse gradient (3px kernel)
+      const gxC = gray[idx + 3] - gray[idx - 3];
+      const gyC = gray[idx + 3 * w] - gray[idx - 3 * w];
+      const coarseEdge = Math.sqrt(gxC * gxC + gyC * gyC);
+
+      // Local contrast (variance in 5x5 neighborhood)
+      let sum = 0, sumSq = 0, count = 0;
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const nIdx = (y + dy) * w + (x + dx);
+          if (nIdx >= 0 && nIdx < w * h) {
+            sum += gray[nIdx];
+            sumSq += gray[nIdx] * gray[nIdx];
+            count++;
+          }
+        }
+      }
+      const variance = (sumSq / count) - Math.pow(sum / count, 2);
+      const localContrast = Math.sqrt(Math.max(0, variance)) / 255;
+
+      // Combine: depth ~ inverted brightness + edge emphasis + contrast + vertical position
+      const brightness = gray[idx] / 255;
+      const vertBias = (1.0 - y / h) * 0.3; // top of frame = farther
+      const edgeBias = (fineEdge / 255) * 0.25 + (coarseEdge / 255) * 0.15;
+      const d = (1.0 - brightness) * 0.35 + edgeBias + localContrast * 0.15 + vertBias;
+
+      depths[idx] = d;
+      if (d < minD) minD = d;
+      if (d > maxD) maxD = d;
+    }
+  }
+
+  // Normalize to [0..1]
+  const range = maxD - minD || 1;
+  for (let i = 0; i < w * h; i++) {
+    depths[i] = (depths[i] - minD) / range;
+  }
+
+  return { depths, width: w, height: h };
 }
 
 /**

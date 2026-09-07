@@ -12,6 +12,7 @@
     "vite": "^8.2.2"
   },
   "dependencies": {
+    "@babylonjs/core": "^9.25.0",
     "lucide": "^1.42.0",
     "three": "^0.185.1"
   }
