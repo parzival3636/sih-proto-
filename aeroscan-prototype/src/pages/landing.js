@@ -1,385 +1,414 @@
 /* ============================================================
-   UNIPASS-3D — Landing Page (Screen 1)
-   Hero + Stats + Pipeline + Comparison + Trust Tags + Footer
+   AEROSCAN-3D — Tactical Landing Page (Screen 1)
+   Reference: C2GRID
+   - Full-bleed aerial reconnaissance photography with dark vignette
+   - Large bold headline with one accent word: "Platform for those who have to act."
+   - Two CTAs: Solid amber "START NEW MISSION", outlined "SEE HOW IT WORKS"
+   - Floating glass tactical callout cards (Multi-spectral / Metric 3DGS)
+   - 3-column stage strip beneath fold (Ingest → Reconstruct → Export)
+   - Live video test dropzone with real frame extraction
+   - Technical benchmark counters with precision ease-out
    ============================================================ */
 
-import { BRAND, PIPELINE_PHASES, TECH_STACK } from '../utils/constants.js';
-import { animateCounter, staggerFadeIn } from '../utils/animations.js';
+import { BRAND, SYSTEM_BENCHMARKS } from '../utils/constants.js';
+import { animateCounter } from '../utils/animations.js';
 import { navigate } from '../utils/router.js';
+import { extractVideoMetadata, extractFrames } from '../utils/videoProcessing.js';
+import { setAppState, getAppState, subscribeAppState } from '../utils/appState.js';
 
 /**
- * Helper: create a DOM element from an HTML string
- */
-function el(html) {
-  const template = document.createElement('template');
-  template.innerHTML = html.trim();
-  return template.content.firstChild;
-}
-
-/**
- * Create the animated particle/grid canvas background for the hero
- */
-function createHeroBackground(container) {
-  const canvas = document.createElement('canvas');
-  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
-  container.appendChild(canvas);
-
-  const ctx = canvas.getContext('2d');
-  let animId = null;
-  let particles = [];
-  const PARTICLE_COUNT = 60;
-
-  function resize() {
-    canvas.width = container.offsetWidth * window.devicePixelRatio;
-    canvas.height = container.offsetHeight * window.devicePixelRatio;
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-  }
-
-  function initParticles() {
-    particles = [];
-    const w = container.offsetWidth;
-    const h = container.offsetHeight;
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      particles.push({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
-        r: Math.random() * 1.5 + 0.5,
-        alpha: Math.random() * 0.3 + 0.1,
-      });
-    }
-  }
-
-  function draw() {
-    const w = container.offsetWidth;
-    const h = container.offsetHeight;
-    ctx.clearRect(0, 0, w, h);
-
-    // Draw faint grid
-    ctx.strokeStyle = 'rgba(0, 229, 255, 0.03)';
-    ctx.lineWidth = 0.5;
-    const gridSize = 60;
-    for (let x = 0; x < w; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
-      ctx.stroke();
-    }
-    for (let y = 0; y < h; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
-      ctx.stroke();
-    }
-
-    // Draw & update particles
-    particles.forEach(p => {
-      p.x += p.vx;
-      p.y += p.vy;
-
-      // Wrap around
-      if (p.x < 0) p.x = w;
-      if (p.x > w) p.x = 0;
-      if (p.y < 0) p.y = h;
-      if (p.y > h) p.y = 0;
-
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(0, 229, 255, ${p.alpha})`;
-      ctx.fill();
-    });
-
-    // Draw connections between nearby particles
-    ctx.lineWidth = 0.5;
-    for (let i = 0; i < particles.length; i++) {
-      for (let j = i + 1; j < particles.length; j++) {
-        const dx = particles[i].x - particles[j].x;
-        const dy = particles[i].y - particles[j].y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 120) {
-          const alpha = (1 - dist / 120) * 0.08;
-          ctx.beginPath();
-          ctx.moveTo(particles[i].x, particles[i].y);
-          ctx.lineTo(particles[j].x, particles[j].y);
-          ctx.strokeStyle = `rgba(0, 229, 255, ${alpha})`;
-          ctx.stroke();
-        }
-      }
-    }
-
-    animId = requestAnimationFrame(draw);
-  }
-
-  resize();
-  initParticles();
-  draw();
-
-  window.addEventListener('resize', () => {
-    resize();
-    initParticles();
-  });
-
-  // Cleanup function
-  return () => {
-    if (animId) cancelAnimationFrame(animId);
-  };
-}
-
-/**
- * Phase icons using inline SVGs (lightweight, no external deps)
- */
-const phaseIcons = {
-  1: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>`,
-  2: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
-  3: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>`,
-  4: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>`,
-  5: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>`,
-  6: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 8-2-2H5L3 8"/><rect x="3" y="8" width="18" height="12" rx="1"/><path d="M10 12h4"/></svg>`,
-};
-
-/**
- * Render the landing page
+ * Render the C2GRID-inspired tactical landing page
  * @returns {HTMLElement}
  */
 export function renderLanding() {
   const page = document.createElement('div');
-  page.className = 'landing-page';
+  page.className = 'landing-container';
 
   page.innerHTML = `
-    <!-- ========== HERO ========== -->
-    <section class="landing-hero" id="landing-hero">
-      <div class="landing-hero-bg" id="hero-bg"></div>
-      <div class="landing-hero-content">
-        <div class="landing-hero-badge">
-          <span class="badge badge-cyan">${BRAND.event}</span>
-        </div>
-        <h1 class="landing-hero-title">${BRAND.systemName}</h1>
-        <p class="landing-hero-tagline">${BRAND.tagline}</p>
-        <p class="landing-hero-problem">"One pass, real-world chaos, and a deadline that can't wait."</p>
-        <div class="landing-hero-cta">
-          <button class="btn btn-primary btn-lg" id="hero-cta">
-            Launch Mission Console
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-          </button>
-          <button class="btn btn-secondary btn-lg" id="hero-learn-more">
-            Explore Pipeline
-          </button>
-        </div>
-      </div>
-    </section>
+    <!-- ================= 1. FULL-BLEED AERIAL HERO ================= -->
+    <section class="landing-hero" id="hero-section">
+      <div class="landing-hero-overlay"></div>
 
-    <!-- ========== STATS ========== -->
-    <section class="landing-stats" id="landing-stats">
-      <div class="glass-card landing-stat-card">
-        <div class="stat-counter">
-          <span class="stat-value" id="stat-time">0</span>
-          <span class="stat-label">Minutes Processing</span>
-        </div>
+      <!-- Top micro-tag -->
+      <div style="position: relative; z-index: 2;">
+        <span class="micro-label" style="color: var(--color-accent); background: rgba(242, 183, 5, 0.1); padding: 4px 10px; border-radius: 4px; border: 1px solid var(--color-border-accent);">
+          DEFENSE & DISASTER RECONNAISSANCE · SINGLE-PASS 3D
+        </span>
       </div>
-      <div class="glass-card landing-stat-card">
-        <div class="stat-counter">
-          <span class="stat-value" id="stat-rmse">0</span>
-          <span class="stat-label">RMSE Accuracy (cm)</span>
-        </div>
-      </div>
-      <div class="glass-card landing-stat-card">
-        <div class="stat-counter">
-          <span class="stat-value" id="stat-gaussians">0</span>
-          <span class="stat-label">Gaussians Reconstructed</span>
-        </div>
-      </div>
-      <div class="glass-card landing-stat-card">
-        <div class="stat-counter">
-          <span class="stat-value" id="stat-flights">0</span>
-          <span class="stat-label">Repeat Flights Required</span>
-        </div>
-      </div>
-    </section>
 
-    <!-- ========== PIPELINE FEATURES ========== -->
-    <section class="landing-features" id="landing-features">
-      <h2 class="landing-features-title">End-to-End Pipeline</h2>
-      <p class="landing-features-subtitle">From a single drone pass to a fully georeferenced, trust-tagged 3D model — no repeat flights, no cloud dependency.</p>
-      <div class="landing-features-grid">
-        ${PIPELINE_PHASES.map(phase => `
-          <div class="glass-card landing-feature-card" data-phase>
-            <div class="landing-feature-icon">${phaseIcons[phase.id] || ''}</div>
-            <span class="landing-feature-phase">Phase ${phase.id}</span>
-            <h3 class="landing-feature-name">${phase.name}</h3>
-            <p class="landing-feature-desc">${phase.desc}</p>
+      <!-- Main Headline & Value Proposition -->
+      <div class="landing-hero-body">
+        <h1 class="landing-hero-title">
+          Platform for those<br>who have to <span class="accent-word">act.</span>
+        </h1>
+        <p class="landing-hero-subhead">
+          Turn raw aerial drone footage into metric 3D intelligence in minutes — fully offline, zero ground markers, zero repeat flights.
+        </p>
+        <div class="landing-hero-ctas">
+          <button class="btn btn-primary btn-lg" id="hero-start-mission">
+            START NEW MISSION
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"/>
+              <polyline points="12 5 19 12 12 19"/>
+            </svg>
+          </button>
+          <button class="btn btn-secondary btn-lg" id="hero-how-it-works">
+            SEE HOW IT WORKS
+          </button>
+        </div>
+      </div>
+
+      <!-- Floating Tactical Callout Card (C2GRID Reference Screenshot 2 & 3) -->
+      <div class="hero-floating-card">
+        <div class="glass-tooltip">
+          <div class="micro-label" style="margin-bottom: 6px; color: var(--color-accent);">TACTICAL TELEMETRY</div>
+          <div class="glass-tooltip-title">Metric 3D Reconstruction</div>
+          <div class="glass-tooltip-desc">
+            Monocular video fused with GPS/IMU. 8.3M Gaussian splats generated with sub-3cm georeferenced RMSE accuracy.
           </div>
-        `).join('')}
+          <a href="#/upload" class="learn-more-link">
+            INSPECT PIPELINE <span>&rarr;</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 3-Column Strip Beneath the Fold (C2GRID Reference) -->
+      <div class="landing-pipeline-strip" id="pipeline-strip">
+        <a href="#/upload" class="pipeline-strip-item">
+          <div class="pipeline-strip-content">
+            <h4>Use any drone footage</h4>
+            <p>UAV, UGV & CONSUMER 4K VIDEO</p>
+          </div>
+          <span class="pipeline-strip-arrow">&rarr;</span>
+        </a>
+
+        <a href="#/pipeline" class="pipeline-strip-item">
+          <div class="pipeline-strip-content">
+            <h4>Reconstruct & detect</h4>
+            <p>AUTOMATICALLY IN MINUTES · OFFLINE</p>
+          </div>
+          <span class="pipeline-strip-arrow">&rarr;</span>
+        </a>
+
+        <a href="#/viewer" class="pipeline-strip-item">
+          <div class="pipeline-strip-content">
+            <h4>Measure, mark & share</h4>
+            <p>POINT CLOUD, 3DGS & METRIC DSM</p>
+          </div>
+          <span class="pipeline-strip-arrow">&rarr;</span>
+        </a>
       </div>
     </section>
 
-    <!-- ========== COMPARISON ========== -->
-    <section class="landing-comparison" id="landing-comparison">
-      <h2 class="landing-comparison-title">Why UNIPASS-3D?</h2>
-      <div class="landing-comparison-grid">
-        <div class="glass-card landing-comparison-card old-way">
-          <div class="landing-comparison-label">Traditional Photogrammetry</div>
-          <ul class="landing-comparison-list">
-            <li>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              80%+ image overlap, dozens of parallel passes
-            </li>
-            <li>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              Hours of flight time and battery swaps
-            </li>
-            <li>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              Ground control points and survey markers required
-            </li>
-            <li>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              Cloud processing, hours to days turnaround
-            </li>
-            <li>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              No confidence metadata on reconstructed surfaces
-            </li>
-          </ul>
+    <!-- ================= 2. REAL VIDEO EXTRACTION TEST DROPZONE ================= -->
+    <section class="landing-dropzone-section" id="interactive-dropzone">
+      <div class="dropzone-header">
+        <div class="dropzone-title-wrap">
+          <span class="micro-label" style="color: var(--color-accent);">REAL HARDWARE SIMULATION</span>
+          <h3>Ingest Drone Video & Extract Live Frames</h3>
+          <p style="color: var(--color-text-secondary); font-size: 0.85rem; margin-top: 4px;">
+            Drag & drop an actual video file (MP4, MOV, WebM). The client-side engine will extract true video metadata and capture real frame canvas snapshots.
+          </p>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="jump-to-upload-btn">
+          OPEN FULL INGEST CONSOLE &rarr;
+        </button>
+      </div>
+
+      <!-- Tactical Upload Drop Box -->
+      <div class="tactical-upload-box" id="drop-zone">
+        <input type="file" id="real-video-input" accept="video/mp4,video/webm,video/quicktime" style="display: none;" />
+        <div class="upload-icon-circle">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <div style="font-size: 0.95rem; font-weight: 700; color: #ffffff; margin-bottom: 4px;">
+          Select or drop mission flight footage
+        </div>
+        <div class="micro-label" style="font-size: 0.7rem; color: var(--color-text-muted);">
+          SUPPORTS 4K UHD, 1080P FHD · PROCESSED LOCALLY IN BROWSER MEMORY
+        </div>
+      </div>
+
+      <!-- Live Metadata & Real Extracted Frames Display Container -->
+      <div id="live-processing-status" style="display: none;"></div>
+      <div id="extracted-frames-container" style="display: none;"></div>
+    </section>
+
+    <!-- ================= 3. BENCHMARK METRIC COUNTERS ================= -->
+    <section class="landing-benchmarks" id="benchmarks-section">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <span class="micro-label">SYSTEM PERFORMANCE BASELINES</span>
+          <h3 style="font-size: 1.3rem; font-weight: 800; color: #ffffff; margin-top: 4px;">
+            Target Hardware Performance Specifications
+          </h3>
+        </div>
+        <span class="micro-label" style="color: var(--color-text-muted);">
+          NVIDIA RTX 4090 · TENSORRT FP16 BENCHMARKS
+        </span>
+      </div>
+
+      <div class="benchmarks-grid">
+        <div class="benchmark-card">
+          <div class="benchmark-value" id="counter-time">0</div>
+          <div class="benchmark-label">Avg. Flight-to-Model Time</div>
+          <div class="benchmark-caption">Landing to metric 3DGS completion</div>
         </div>
 
-        <div class="landing-comparison-vs">VS</div>
+        <div class="benchmark-card">
+          <div class="benchmark-value" id="counter-rmse">0</div>
+          <div class="benchmark-label">Reconstruction RMSE</div>
+          <div class="benchmark-caption">Georeferenced spatial error</div>
+        </div>
 
-        <div class="glass-card landing-comparison-card new-way">
-          <div class="landing-comparison-label">UNIPASS-3D</div>
-          <ul class="landing-comparison-list">
-            <li>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              One low pass — single flight, no repeat missions
-            </li>
-            <li>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              ~15–20 minutes from landing to 3D model
-            </li>
-            <li>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              Fully offline — no cloud, no connectivity needed
-            </li>
-            <li>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              GPS/IMU fusion — no ground markers required
-            </li>
-            <li>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              Every surface trust-tagged: Observed, Inferred, or AI-Completed
-            </li>
-          </ul>
+        <div class="benchmark-card">
+          <div class="benchmark-value" id="counter-gaussians">0</div>
+          <div class="benchmark-label">Gaussian Splat Density</div>
+          <div class="benchmark-caption">High-fidelity 3D radiance points</div>
+        </div>
+
+        <div class="benchmark-card">
+          <div class="benchmark-value" id="counter-passes">0</div>
+          <div class="benchmark-label">Flight Passes Required</div>
+          <div class="benchmark-caption">Zero repeat missions or battery swaps</div>
         </div>
       </div>
     </section>
 
-    <!-- ========== TRUST TAGS ========== -->
-    <section class="landing-trust" id="landing-trust">
-      <h2 class="landing-trust-title">Built-In Confidence Transparency</h2>
-      <p class="landing-trust-subtitle">Every surface in the reconstructed model carries a trust tag — no black-box outputs, no hidden assumptions.</p>
-      <div class="landing-trust-grid">
-        <div class="glass-card landing-trust-card" data-trust>
-          <span class="badge badge-observed">● Observed</span>
-          <p>Directly captured by the camera and geometrically verified. This surface exists in the raw sensor data — highest confidence.</p>
-        </div>
-        <div class="glass-card landing-trust-card" data-trust>
-          <span class="badge badge-inferred">● Inferred</span>
-          <p>Estimated through multi-view geometry, depth fusion, or sensor interpolation. Structurally plausible, but not directly observed.</p>
-        </div>
-        <div class="glass-card landing-trust-card" data-trust>
-          <span class="badge badge-ai-completed">● AI-Completed</span>
-          <p>Gap-filled by AI models (LaMa, diffusion inpainting). Visually coherent, but flagged as synthetic — lowest confidence.</p>
-        </div>
+    <!-- ================= 4. MINIMAL TACTICAL FOOTER ================= -->
+    <footer class="landing-footer">
+      <div>
+        <span style="font-weight: 700; color: #ffffff;">${BRAND.systemName}</span>
+        <span style="margin: 0 8px; color: var(--color-border-subtle);">|</span>
+        <span>${BRAND.teamName}</span>
+        <span style="margin: 0 8px; color: var(--color-border-subtle);">·</span>
+        <span>${BRAND.event}</span>
       </div>
-    </section>
-
-    <!-- ========== FOOTER ========== -->
-    <footer class="landing-footer" id="landing-footer">
-      <div class="landing-footer-brand">${BRAND.systemName}</div>
-      <div class="landing-footer-event">${BRAND.teamName} · ${BRAND.event}</div>
-      <div class="landing-footer-tech">
-        ${TECH_STACK.map(t => `<span class="landing-footer-tech-item">${t}</span>`).join('')}
+      <div class="micro-label">
+        OFFLINE DEFENSE/DISASTER SITUATIONAL INTELLIGENCE
       </div>
     </footer>
   `;
 
-  // --- Event Listeners ---
+  // --- Attach Interactive Event Handlers ---
 
-  // Hero CTA → Dashboard
-  page.querySelector('#hero-cta').addEventListener('click', () => {
-    navigate('/dashboard');
+  // Hero CTAs
+  const startMissionBtn = page.querySelector('#hero-start-mission');
+  startMissionBtn.addEventListener('click', () => navigate('/upload'));
+
+  const howItWorksBtn = page.querySelector('#hero-how-it-works');
+  howItWorksBtn.addEventListener('click', () => {
+    const dropzoneSec = page.querySelector('#interactive-dropzone');
+    dropzoneSec.scrollIntoView({ behavior: 'smooth' });
   });
 
-  // "Explore Pipeline" → scroll to features section
-  page.querySelector('#hero-learn-more').addEventListener('click', () => {
-    page.querySelector('#landing-features').scrollIntoView({ behavior: 'smooth' });
+  const jumpUploadBtn = page.querySelector('#jump-to-upload-btn');
+  jumpUploadBtn.addEventListener('click', () => navigate('/upload'));
+
+  // Drag and Drop real video input handlers
+  const dropZone = page.querySelector('#drop-zone');
+  const fileInput = page.querySelector('#real-video-input');
+
+  dropZone.addEventListener('click', () => fileInput.click());
+
+  ['dragenter', 'dragover'].forEach(eventName => {
+    dropZone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-active');
+    });
   });
 
-  // --- Hero Background Animation ---
-  requestAnimationFrame(() => {
-    const heroBg = page.querySelector('#hero-bg');
-    if (heroBg) createHeroBackground(heroBg);
+  ['dragleave', 'drop'].forEach(eventName => {
+    dropZone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-active');
+    });
   });
 
-  // --- Intersection Observer for Stat Counters ---
-  let statsAnimated = false;
-  const statsObserver = new IntersectionObserver((entries) => {
+  dropZone.addEventListener('drop', (e) => {
+    const files = e.dataTransfer.files;
+    if (files && files[0] && files[0].type.startsWith('video/')) {
+      handleRealVideoUpload(files[0], page);
+    }
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    const files = e.target.files;
+    if (files && files[0]) {
+      handleRealVideoUpload(files[0], page);
+    }
+  });
+
+  // Check if state already has video metadata from previous upload
+  const existingState = getAppState();
+  if (existingState.metadata) {
+    renderExtractedMetadataAndFrames(page, existingState.metadata, existingState.frames);
+  }
+
+  // --- Scroll-Triggered Animated Benchmark Counters ---
+  let countersAnimated = false;
+  const benchmarksObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
-      if (entry.isIntersecting && !statsAnimated) {
-        statsAnimated = true;
+      if (entry.isIntersecting && !countersAnimated) {
+        countersAnimated = true;
 
-        animateCounter(page.querySelector('#stat-time'), 0, 17, 2000, {
-          decimals: 0, prefix: '~', suffix: ' min'
+        animateCounter(page.querySelector('#counter-time'), 0, SYSTEM_BENCHMARKS.avgProcessingTimeMin, 1800, {
+          decimals: 1, suffix: ' min'
         });
-        animateCounter(page.querySelector('#stat-rmse'), 0, 2.3, 2000, {
+        animateCounter(page.querySelector('#counter-rmse'), 0, SYSTEM_BENCHMARKS.reconstructionAccuracyRmseCm, 1800, {
           decimals: 1, suffix: ' cm'
         });
-        animateCounter(page.querySelector('#stat-gaussians'), 0, 8300000, 2500, {
-          decimals: 0, suffix: '+'
+        animateCounter(page.querySelector('#counter-gaussians'), 0, 8.3, 2000, {
+          decimals: 1, suffix: 'M'
         });
-        // "Zero" stays at 0
-        page.querySelector('#stat-flights').textContent = 'Zero';
+        animateCounter(page.querySelector('#counter-passes'), 0, 1, 1000, {
+          decimals: 0, suffix: ' Pass'
+        });
 
-        statsObserver.disconnect();
+        benchmarksObserver.disconnect();
       }
     });
-  }, { threshold: 0.3 });
+  }, { threshold: 0.25 });
 
-  // Observe after mount
   requestAnimationFrame(() => {
-    const statsSection = page.querySelector('#landing-stats');
-    if (statsSection) statsObserver.observe(statsSection);
-  });
-
-  // --- Stagger fade-in for feature cards ---
-  requestAnimationFrame(() => {
-    const featuresSection = page.querySelector('#landing-features');
-    if (featuresSection) {
-      const featureObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            staggerFadeIn(featuresSection, '[data-phase]', 100);
-            featureObserver.disconnect();
-          }
-        });
-      }, { threshold: 0.15 });
-      featureObserver.observe(featuresSection);
-    }
-
-    // Trust cards stagger
-    const trustSection = page.querySelector('#landing-trust');
-    if (trustSection) {
-      const trustObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            staggerFadeIn(trustSection, '[data-trust]', 120);
-            trustObserver.disconnect();
-          }
-        });
-      }, { threshold: 0.15 });
-      trustObserver.observe(trustSection);
-    }
+    const benchSection = page.querySelector('#benchmarks-section');
+    if (benchSection) benchmarksObserver.observe(benchSection);
   });
 
   return page;
+}
+
+/**
+ * Handle real video file upload: extract metadata + real frames and store in appState
+ */
+async function handleRealVideoUpload(file, container) {
+  const statusContainer = container.querySelector('#live-processing-status');
+  const framesContainer = container.querySelector('#extracted-frames-container');
+
+  statusContainer.style.display = 'block';
+  statusContainer.innerHTML = `
+    <div class="glass-panel" style="padding: 18px 24px; margin-top: 16px;">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="status-dot"></div>
+          <div>
+            <div style="font-weight: 700; color: #ffffff; font-size: 0.9rem;">
+              Probing Video Metadata: <span style="color: var(--color-accent);">${file.name}</span>
+            </div>
+            <div class="micro-label" style="margin-top: 2px;">
+              PARSING VIDEO STREAM & TIMESTAMPS...
+            </div>
+          </div>
+        </div>
+        <div class="mono-number" id="extraction-progress-label" style="font-size: 0.8rem; color: var(--color-accent);">
+          EXTRACTING
+        </div>
+      </div>
+    </div>
+  `;
+
+  try {
+    // 1. Extract genuine metadata
+    const metadata = await extractVideoMetadata(file);
+
+    // Update appState with video file and metadata
+    setAppState({
+      videoFile: file,
+      videoUrl: metadata.objectUrl,
+      metadata,
+    });
+
+    console.log('[AeroScan3D] Real Video Metadata Extracted:', metadata);
+
+    // 2. Extract genuine frames from real video
+    const progressLabel = container.querySelector('#extraction-progress-label');
+    const frames = await extractFrames(metadata.objectUrl, 8, 480, (prog) => {
+      if (progressLabel) {
+        progressLabel.textContent = `FRAMES ${prog.current}/${prog.total} (${prog.percent}%)`;
+      }
+    });
+
+    // Update appState with extracted frames
+    setAppState({ frames });
+    console.log('[AeroScan3D] Real Extracted Frames (Canvas drawImage):', frames);
+
+    // Render results in the UI
+    renderExtractedMetadataAndFrames(container, metadata, frames);
+
+  } catch (error) {
+    console.error('[AeroScan3D] Video processing failed:', error);
+    statusContainer.innerHTML = `
+      <div class="glass-panel" style="padding: 16px 20px; margin-top: 16px; border-color: rgba(255, 82, 82, 0.4);">
+        <div style="color: #ff5252; font-weight: 700; font-size: 0.85rem;">Processing Error: ${error.message}</div>
+      </div>
+    `;
+  }
+}
+
+/**
+ * Display real extracted metadata and frame thumbnails in the UI
+ */
+function renderExtractedMetadataAndFrames(container, metadata, frames) {
+  const statusContainer = container.querySelector('#live-processing-status');
+  const framesContainer = container.querySelector('#extracted-frames-container');
+  if (!statusContainer || !framesContainer) return;
+
+  statusContainer.style.display = 'block';
+  statusContainer.innerHTML = `
+    <div class="glass-panel" style="padding: 20px 24px; margin-top: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <div class="micro-label" style="color: var(--color-observed);">STATUS: METADATA & FRAMES EXTRACTED AND SAVED TO APPSTATE</div>
+          <div style="font-size: 1.1rem; font-weight: 800; color: #ffffff; margin-top: 4px;">
+            ${metadata.name}
+          </div>
+          <div style="display: flex; gap: 16px; margin-top: 8px; flex-wrap: wrap; font-size: 0.78rem; font-family: var(--font-mono); color: var(--color-text-secondary);">
+            <span>FORMAT: <strong style="color: #fff;">${metadata.type}</strong></span>
+            <span>SIZE: <strong style="color: #fff;">${metadata.formattedSize}</strong></span>
+            <span>DURATION: <strong style="color: #fff;">${metadata.formattedDuration} (${metadata.durationSec}s)</strong></span>
+            <span>RESOLUTION: <strong style="color: var(--color-accent);">${metadata.resolution}</strong></span>
+            <span>EST. FRAMES: <strong style="color: #fff;">~${metadata.totalFramesEstimate}</strong></span>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-primary btn-sm" id="go-to-pipeline-btn">
+            RUN RECONSTRUCTION PIPELINE &rarr;
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const pipelineBtn = statusContainer.querySelector('#go-to-pipeline-btn');
+  if (pipelineBtn) {
+    pipelineBtn.addEventListener('click', () => navigate('/pipeline'));
+  }
+
+  // Render actual frame thumbnails
+  if (frames && frames.length > 0) {
+    framesContainer.style.display = 'block';
+    framesContainer.innerHTML = `
+      <div style="margin-top: 20px;">
+        <div class="micro-label" style="margin-bottom: 8px;">
+          REAL EXTRACTED FRAME SNAPSHOTS (${frames.length} FRAMES VIA CANVAS DRAWIMAGE)
+        </div>
+        <div class="extracted-frames-preview">
+          ${frames.map(f => `
+            <div class="frame-thumbnail-card">
+              <img src="${f.dataUrl}" class="frame-thumbnail-img" alt="Frame ${f.index}" />
+              <div class="frame-meta-bar">
+                <span>#${f.index}</span>
+                <span>${f.timestampSec}s</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
 }

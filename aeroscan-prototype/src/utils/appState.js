@@ -1,0 +1,137 @@
+/* ============================================================
+   AEROSCAN-3D / UNIPASS-3D — Shared Application State (Pub/Sub)
+   Single source of truth holding real uploaded video data,
+   extracted metadata, real video frames, and pipeline status.
+   ============================================================
+
+   STATE CONTRACT SHAPE:
+   {
+     videoFile: File | null,               // The raw user-uploaded video File object
+     videoUrl: string | null,              // Blob URL (URL.createObjectURL) for video element playback
+     metadata: {
+       name: string,                       // e.g. "DJI_0042_SURVEY.MP4"
+       sizeBytes: number,                  // e.g. 48291040
+       formattedSize: string,              // e.g. "46.1 MB"
+       type: string,                       // e.g. "video/mp4"
+       durationSec: number,                // e.g. 18.42
+       formattedDuration: string,          // e.g. "00:18"
+       width: number,                      // e.g. 3840
+       height: number,                     // e.g. 2160
+       resolution: string,                 // e.g. "4K UHD (3840x2160)"
+       fpsEstimate: number,                // e.g. 30
+       totalFramesEstimate: number,        // e.g. 552
+       lastModified: number                // Unix timestamp
+     } | null,
+     frames: Array<{                       // Real extracted frame snapshots from the uploaded video
+       index: number,
+       timestampSec: number,
+       dataUrl: string,                    // Base64 JPEG data URL captured via Canvas.drawImage
+       width: number,
+       height: number
+     }>,
+     pipeline: {
+       isProcessing: boolean,
+       isCompleted: boolean,
+       currentStage: number,               // 1 to 5
+       stageProgress: number,              // 0 to 100
+       overallProgress: number,            // 0 to 100
+       activeStageName: string,
+       metrics: {
+         reprojectionError: number | null,
+         gaussiansCount: number | null,
+         psnr: number | null,
+         rmseCm: number | null
+       },
+       logs: Array<{ timestamp: string, text: string, level: 'info'|'warn'|'success' }>
+     },
+     activeMissionId: string | null
+   }
+   ============================================================ */
+
+const initialAppState = {
+  videoFile: null,
+  videoUrl: null,
+  metadata: null,
+  frames: [],
+  pipeline: {
+    isProcessing: false,
+    isCompleted: false,
+    currentStage: 1,
+    stageProgress: 0,
+    overallProgress: 0,
+    activeStageName: 'Idle',
+    metrics: {
+      reprojectionError: null,
+      gaussiansCount: null,
+      psnr: null,
+      rmseCm: null,
+    },
+    logs: [],
+  },
+  activeMissionId: null,
+};
+
+// Global in-memory state singleton
+let state = { ...initialAppState };
+
+// Pub/Sub listeners set
+const listeners = new Set();
+
+/**
+ * Get a read-only snapshot of current app state
+ * @returns {typeof initialAppState}
+ */
+export function getAppState() {
+  return state;
+}
+
+/**
+ * Update partial state and notify all subscribers
+ * @param {Partial<typeof initialAppState> | ((prevState: typeof initialAppState) => Partial<typeof initialAppState>)} updater
+ */
+export function setAppState(updater) {
+  const partial = typeof updater === 'function' ? updater(state) : updater;
+  state = {
+    ...state,
+    ...partial,
+    // Deep merge nested objects if provided
+    metadata: partial.metadata !== undefined ? partial.metadata : state.metadata,
+    pipeline: partial.pipeline !== undefined ? { ...state.pipeline, ...partial.pipeline } : state.pipeline,
+  };
+
+  // Broadcast to all active subscribers
+  listeners.forEach((listener) => {
+    try {
+      listener(state);
+    } catch (err) {
+      console.error('[AppState] Error in subscriber callback:', err);
+    }
+  });
+
+  return state;
+}
+
+/**
+ * Subscribe to state updates. Returns an unsubscribe function.
+ * @param {(state: typeof initialAppState) => void} listener
+ * @returns {() => void} Unsubscribe function
+ */
+export function subscribeAppState(listener) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/**
+ * Reset application state (e.g. for new mission)
+ */
+export function resetAppState() {
+  if (state.videoUrl) {
+    URL.revokeObjectURL(state.videoUrl);
+  }
+  return setAppState({
+    ...initialAppState,
+    pipeline: { ...initialAppState.pipeline, logs: [] },
+  });
+}

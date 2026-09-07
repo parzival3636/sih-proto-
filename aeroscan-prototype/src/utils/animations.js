@@ -1,104 +1,71 @@
 /* ============================================================
-   UNIPASS-3D — Animation Utilities
-   Pure JS + requestAnimationFrame, zero dependencies
+   AEROSCAN-3D — Real & Precision Motion Utilities
+   Zero decorative clutter — purely numeric count-ups and
+   tactical skeleton loading states.
    ============================================================ */
 
 /**
- * Easing functions
+ * Fast start, precision settle easing curve (Quart/Expo ease-out)
  */
-const easings = {
-  easeOutExpo: (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
-  easeOutCubic: (t) => 1 - Math.pow(1 - t, 3),
-  easeOutQuart: (t) => 1 - Math.pow(1 - t, 4),
-  easeInOutCubic: (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
-  linear: (t) => t,
-};
-
-/**
- * Format a number with commas and optional decimals
- */
-function formatNumber(value, decimals = 0) {
-  const fixed = value.toFixed(decimals);
-  const [intPart, decPart] = fixed.split('.');
-  const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return decPart !== undefined ? `${withCommas}.${decPart}` : withCommas;
+function easeOutExpo(t) {
+  return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
 }
 
 /**
- * Animate a counter from `from` to `to` inside an element's textContent
+ * Animate a numeric DOM counter from start to end value
  * 
- * @param {HTMLElement} el - The DOM element to update
- * @param {number} from - Starting value
- * @param {number} to - Ending value
- * @param {number} durationMs - Animation duration in milliseconds
- * @param {object} options
- * @param {number} options.decimals - Number of decimal places (default 0)
- * @param {string} options.easing - Easing function name (default 'easeOutExpo')
- * @param {string} options.prefix - Text prefix (e.g. '~')
- * @param {string} options.suffix - Text suffix (e.g. 'cm')
+ * @param {HTMLElement} el - Target DOM node
+ * @param {number} from - Initial numeric value
+ * @param {number} to - Final numeric value
+ * @param {number} durationMs - Duration in milliseconds
+ * @param {object} [options]
+ * @param {number} [options.decimals=0] - Decimal places
+ * @param {string} [options.prefix=''] - Leading prefix (e.g. '~')
+ * @param {string} [options.suffix=''] - Trailing suffix (e.g. ' min', ' cm')
+ * @returns {() => void} Cancel animation function
  */
-export function animateCounter(el, from, to, durationMs, { decimals = 0, easing = 'easeOutExpo', prefix = '', suffix = '' } = {}) {
-  const easeFn = easings[easing] || easings.easeOutExpo;
+export function animateCounter(el, from, to, durationMs = 1500, { decimals = 0, prefix = '', suffix = '' } = {}) {
+  if (!el) return () => {};
+
   let startTime = null;
-  let animationId = null;
+  let rafId = null;
 
-  function tick(timestamp) {
+  function step(timestamp) {
     if (!startTime) startTime = timestamp;
-    const elapsed = timestamp - startTime;
-    const progress = Math.min(elapsed / durationMs, 1);
-    const easedProgress = easeFn(progress);
-    const currentValue = from + (to - from) * easedProgress;
+    const progress = Math.min((timestamp - startTime) / durationMs, 1);
+    const eased = easeOutExpo(progress);
+    const current = from + (to - from) * eased;
 
-    el.textContent = `${prefix}${formatNumber(currentValue, decimals)}${suffix}`;
+    const formatted = current.toLocaleString('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+
+    el.textContent = `${prefix}${formatted}${suffix}`;
 
     if (progress < 1) {
-      animationId = requestAnimationFrame(tick);
+      rafId = requestAnimationFrame(step);
     }
   }
 
-  // Set initial value
-  el.textContent = `${prefix}${formatNumber(from, decimals)}${suffix}`;
-  animationId = requestAnimationFrame(tick);
+  el.textContent = `${prefix}${from.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}${suffix}`;
+  rafId = requestAnimationFrame(step);
 
-  // Return cancel function
   return () => {
-    if (animationId) cancelAnimationFrame(animationId);
+    if (rafId) cancelAnimationFrame(rafId);
   };
 }
 
 /**
- * Add or remove the shimmer loading class
- * 
- * @param {HTMLElement} el - The DOM element
- * @param {boolean} enable - Whether to enable (true) or disable (false) shimmer
+ * Toggle shimmer loading skeleton class on an element
+ * @param {HTMLElement} el 
+ * @param {boolean} [enable=true] 
  */
 export function shimmer(el, enable = true) {
+  if (!el) return;
   if (enable) {
     el.classList.add('shimmer');
   } else {
     el.classList.remove('shimmer');
   }
-}
-
-/**
- * Create a staggered fade-in animation for child elements
- * 
- * @param {HTMLElement} container - Parent container
- * @param {string} selector - CSS selector for children to animate
- * @param {number} staggerMs - Delay between each child animation (default 80ms)
- */
-export function staggerFadeIn(container, selector, staggerMs = 80) {
-  const children = container.querySelectorAll(selector);
-  children.forEach((child, i) => {
-    child.style.opacity = '0';
-    child.style.transform = 'translateY(16px)';
-    child.style.transition = `opacity 0.5s ease ${i * staggerMs}ms, transform 0.5s ease ${i * staggerMs}ms`;
-    // Trigger reflow then animate
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        child.style.opacity = '1';
-        child.style.transform = 'translateY(0)';
-      });
-    });
-  });
 }

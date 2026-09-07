@@ -1,7 +1,8 @@
 /* ============================================================
-   UNIPASS-3D — Hash-Based SPA Router
-   Supports: #/, #/dashboard, #/upload, #/pipeline, #/viewer,
-             #/viewer/:missionId
+   AEROSCAN-3D — Clean Hash-Based SPA Router
+   Routes: #/, #/dashboard, #/upload, #/pipeline, #/viewer
+   Supports parameter deep linking (e.g. #/viewer/:missionId)
+   Persists shared appState across all transitions.
    ============================================================ */
 
 import { renderLanding } from '../pages/landing.js';
@@ -9,34 +10,29 @@ import { renderDashboard } from '../pages/dashboard.js';
 import { renderUpload } from '../pages/upload.js';
 import { renderPipeline } from '../pages/pipeline.js';
 import { renderViewer } from '../pages/viewer.js';
-import { NAV_ITEMS } from './constants.js';
 
-/**
- * Route definitions: path pattern → render function & metadata
- */
 const routes = [
-  { pattern: /^#\/$/, path: '#/', render: renderLanding, label: 'Home', breadcrumb: 'Home' },
-  { pattern: /^#\/dashboard$/, path: '#/dashboard', render: renderDashboard, label: 'Dashboard', breadcrumb: 'Mission Dashboard' },
-  { pattern: /^#\/upload$/, path: '#/upload', render: renderUpload, label: 'New Mission', breadcrumb: 'Mission Upload' },
-  { pattern: /^#\/pipeline$/, path: '#/pipeline', render: renderPipeline, label: 'Processing', breadcrumb: 'Pipeline Visualizer' },
-  { pattern: /^#\/viewer(\/([^/]+))?$/, path: '#/viewer', render: renderViewer, label: '3D Viewer', breadcrumb: '3D Model Viewer' },
+  { pattern: /^#\/$/, path: '#/', render: renderLanding, label: 'Overview', breadcrumb: 'Overview' },
+  { pattern: /^#\/dashboard$/, path: '#/dashboard', render: renderDashboard, label: 'Missions', breadcrumb: 'Missions Registry' },
+  { pattern: /^#\/upload$/, path: '#/upload', render: renderUpload, label: 'New Mission', breadcrumb: 'Ingest Footage' },
+  { pattern: /^#\/pipeline$/, path: '#/pipeline', render: renderPipeline, label: 'Processing', breadcrumb: 'Reconstruction Pipeline' },
+  { pattern: /^#\/viewer(\/([^/]+))?$/, path: '#/viewer', render: renderViewer, label: '3D Spatial', breadcrumb: '3D Intelligence' },
 ];
 
-let currentRoute = null;
-let routeParams = {};
-let onRouteChangeCallbacks = [];
+let activeRoute = null;
+let currentParams = {};
+let currentCleanup = null;
+const listeners = [];
 
 /**
- * Parse the current hash and find matching route
+ * Match a raw hash against defined routes
  */
-function matchRoute(hash) {
-  if (!hash || hash === '#' || hash === '') hash = '#/';
-
+function matchRoute(rawHash) {
+  const hash = (!rawHash || rawHash === '#' || rawHash === '') ? '#/' : rawHash;
   for (const route of routes) {
     const match = hash.match(route.pattern);
     if (match) {
       const params = {};
-      // Extract missionId from viewer route
       if (route.path === '#/viewer' && match[2]) {
         params.missionId = match[2];
       }
@@ -47,87 +43,109 @@ function matchRoute(hash) {
 }
 
 /**
- * Get current route parameters (e.g. { missionId: 'MSN-001' })
- */
-export function getRouteParams() {
-  return { ...routeParams };
-}
-
-/**
- * Programmatically navigate to a path
- * @param {string} path - Hash path (e.g. '#/dashboard' or '#/viewer/MSN-001')
+ * Programmatic client navigation
+ * @param {string} path - e.g. '/upload' or '#/pipeline'
  */
 export function navigate(path) {
-  if (!path.startsWith('#')) path = '#' + path;
-  window.location.hash = path;
+  const target = path.startsWith('#') ? path : `#${path.startsWith('/') ? path : '/' + path}`;
+  if (window.location.hash === target) {
+    handleRouteChange();
+  } else {
+    window.location.hash = target;
+  }
 }
 
 /**
- * Register a callback for route changes
- * Callback receives: { route, params, basePath }
+ * Get active route parameters (e.g. { missionId: 'MSN-7091' })
+ */
+export function getRouteParams() {
+  return { ...currentParams };
+}
+
+/**
+ * Get the current canonical route path (e.g. '#/upload')
+ */
+export function getCurrentPath() {
+  return activeRoute ? activeRoute.path : '#/';
+}
+
+/**
+ * Subscribe to route changes
+ * @param {(routeInfo: { route: typeof routes[0], params: object, path: string, breadcrumb: string }) => void} callback
  */
 export function onRouteChange(callback) {
-  onRouteChangeCallbacks.push(callback);
+  listeners.push(callback);
 }
 
 /**
- * Handle a route change: match, render, and notify listeners
+ * Execute route transition: unmount current page cleanly, mount next page DOM
  */
 function handleRouteChange() {
-  const hash = window.location.hash || '#/';
-  const matched = matchRoute(hash);
+  const matched = matchRoute(window.location.hash);
 
   if (!matched) {
-    // 404 fallback: redirect to landing
+    // 404 fallback to overview
     window.location.hash = '#/';
     return;
   }
 
   const { route, params } = matched;
-  currentRoute = route;
-  routeParams = params;
+  activeRoute = route;
+  currentParams = params;
 
-  // Render the page into #app-content
-  const contentEl = document.getElementById('app-content');
-  if (contentEl) {
-    // Clear previous content
-    contentEl.innerHTML = '';
+  // Unmount previous page cleanly if a cleanup hook was registered
+  if (typeof currentCleanup === 'function') {
+    try {
+      currentCleanup();
+    } catch (e) {
+      console.error('[Router] Error during page unmount:', e);
+    }
+    currentCleanup = null;
+  }
 
-    // Get the rendered DOM from the page module
-    const pageEl = route.render(params);
-    if (pageEl instanceof HTMLElement) {
-      contentEl.appendChild(pageEl);
-    } else if (typeof pageEl === 'string') {
-      contentEl.innerHTML = pageEl;
+  const container = document.getElementById('app-content');
+  if (container) {
+    container.innerHTML = '';
+
+    // Render new page
+    const rendered = route.render(params);
+
+    if (rendered instanceof HTMLElement) {
+      container.appendChild(rendered);
+      // Check if rendered element has an attached unmount hook
+      if (typeof rendered.unmount === 'function') {
+        currentCleanup = rendered.unmount;
+      }
+    } else if (typeof rendered === 'string') {
+      container.innerHTML = rendered;
     }
   }
 
-  // Notify all listeners (sidebar, header, etc.)
-  onRouteChangeCallbacks.forEach(cb => {
-    cb({
-      route,
-      params,
-      basePath: route.path,
-      breadcrumb: route.breadcrumb,
-      label: route.label,
-    });
+  // Notify shell components (sidebar, header)
+  listeners.forEach(cb => {
+    try {
+      cb({
+        route,
+        params,
+        path: route.path,
+        breadcrumb: route.breadcrumb,
+        label: route.label,
+      });
+    } catch (err) {
+      console.error('[Router] Error in route listener:', err);
+    }
   });
+
+  // Scroll to top of content area on navigation
+  window.scrollTo(0, 0);
 }
 
 /**
- * Get the current route's base path
- */
-export function getCurrentPath() {
-  return currentRoute ? currentRoute.path : '#/';
-}
-
-/**
- * Initialize the router: listen for hash changes and handle initial route
+ * Initialize hash router
  */
 export function initRouter() {
   window.addEventListener('hashchange', handleRouteChange);
 
-  // Handle initial load
   if (!window.location.hash || window.location.hash === '#') {
     window.location.hash = '#/';
   } else {
