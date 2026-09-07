@@ -4,6 +4,7 @@
    ============================================================ */
 
 import './styles/index.css';
+import './styles/pipeline.css';
 import { initSidebar } from './components/sidebar.js';
 import { initHeader } from './components/header.js';
 import { initRouter } from './utils/router.js';

@@ -1,0 +1,832 @@
+/* ============================================================
+   AEROSCAN-3D — Pipeline CSS (Dev 3 — Reconstruction Pipeline)
+   Follows C2GRID tactical design system from index.css.
+   Amber accent, glass panels, JetBrains Mono numerics.
+   ============================================================ */
+
+/* ============================================================
+   1. PAGE LAYOUT — Main + Sidebar Grid
+   ============================================================ */
+.pl-page {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  grid-template-rows: auto 1fr auto;
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 24px 32px 32px;
+  min-height: calc(100vh - var(--header-height) - 48px);
+}
+
+.pl-header {
+  grid-column: 1 / -1;
+}
+
+.pl-main {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.pl-sidebar {
+  grid-column: 2;
+  grid-row: 2 / 4;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: calc(var(--header-height) + 24px);
+  max-height: calc(100vh - var(--header-height) - 48px);
+  overflow-y: auto;
+}
+
+.pl-terminal-wrap {
+  grid-column: 1;
+  grid-row: 3;
+}
+
+/* ============================================================
+   2. HEADER BAR
+   ============================================================ */
+.pl-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.pl-header-left h2 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #fff;
+  margin-top: 2px;
+}
+
+.pl-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pl-stage-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--color-accent-dim);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border-accent);
+}
+
+.pl-stage-badge .pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: plPulse 1.5s ease-in-out infinite;
+}
+
+.pl-frame-count-badge {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  padding: 5px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+/* ============================================================
+   3. OVERALL PROGRESS BAR
+   ============================================================ */
+.pl-progress-strip {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.pl-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent), #ffd54f);
+  border-radius: var(--radius-full);
+  transition: width 0.4s ease;
+  box-shadow: 0 0 8px var(--color-accent-glow);
+}
+
+/* ============================================================
+   4. STAGE VISUALIZATION AREA
+   ============================================================ */
+.pl-stage-container {
+  min-height: 380px;
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+}
+
+.pl-stage-title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pl-stage-name {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pl-stage-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.pl-stage-timer {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+/* Stage-specific sub-progress */
+.pl-stage-progress {
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-full);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.pl-stage-progress-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
+/* ============================================================
+   5. STAGE 1 — VIDEO PREP (Thumbnail Gallery)
+   ============================================================ */
+.pl-thumb-gallery {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 8px 0;
+  scroll-behavior: smooth;
+}
+
+.pl-thumb-gallery::-webkit-scrollbar {
+  height: 3px;
+}
+
+.pl-thumb-card {
+  flex: 0 0 140px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  background: #0c0c10;
+  position: relative;
+  transition: border-color 0.2s ease;
+}
+
+.pl-thumb-card.active {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 12px var(--color-accent-glow);
+}
+
+.pl-thumb-img {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  display: block;
+}
+
+.pl-thumb-meta {
+  padding: 4px 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.pl-quality-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pl-quality-dot.sharp {
+  background: #22c55e;
+  box-shadow: 0 0 4px rgba(34, 197, 94, 0.5);
+}
+
+.pl-quality-dot.blurry {
+  background: #ef4444;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.5);
+}
+
+.pl-frame-counters {
+  display: flex;
+  gap: 24px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.pl-counter-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pl-counter-value {
+  font-family: var(--font-mono);
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+
+.pl-counter-label {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ============================================================
+   6. STAGE 2 — POSE ESTIMATION (Canvas Overlay)
+   ============================================================ */
+.pl-pose-canvas-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #0a0a0d;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.pl-pose-canvas-wrap canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.pl-pose-metrics {
+  display: flex;
+  gap: 20px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.pl-pose-metric-card {
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.pl-metric-value {
+  font-family: var(--font-mono);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.1;
+}
+
+.pl-metric-label {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pl-metric-tag {
+  font-size: 0.55rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* ============================================================
+   7. STAGE 3 — DEPTH ESTIMATION (Dual-Pane Crossfade)
+   ============================================================ */
+.pl-depth-dual-pane {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.pl-depth-pane {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  position: relative;
+  background: #0a0a0d;
+}
+
+.pl-depth-pane img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.5s ease;
+}
+
+.pl-depth-pane-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  background: rgba(0, 0, 0, 0.7);
+  color: var(--color-accent);
+  border: 1px solid rgba(242, 183, 5, 0.3);
+}
+
+.pl-depth-frame-indicator {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* ============================================================
+   8. STAGE 4 — 3D RECONSTRUCTION (Point Cloud Canvas)
+   ============================================================ */
+.pl-pointcloud-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #060609;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.pl-pointcloud-wrap canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.pl-pointcloud-stats {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.pl-pc-stat {
+  padding: 8px 14px;
+  flex: 1;
+  min-width: 100px;
+}
+
+.pl-graph-canvas {
+  width: 100%;
+  height: 80px;
+  margin-top: 8px;
+}
+
+/* ============================================================
+   9. STAGE 5 — GEOREFERENCING
+   ============================================================ */
+.pl-geo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.pl-geo-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pl-geo-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.pl-geo-check-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.pl-geo-check-icon.done {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.pl-geo-check-icon.pending {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.pl-geo-rmse-gauge {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.pl-geo-rmse-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, var(--color-accent));
+  border-radius: var(--radius-full);
+  transition: width 0.6s ease;
+}
+
+.pl-geo-simulated-tag {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--color-ai-completed);
+  font-style: italic;
+  letter-spacing: 0.04em;
+}
+
+/* ============================================================
+   10. SIDEBAR — Stage Cards + Metrics
+   ============================================================ */
+.pl-sidebar-card {
+  padding: 12px 14px;
+}
+
+.pl-sidebar-card-title {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+}
+
+/* Stage steps in sidebar */
+.pl-stage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pl-stage-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  transition: all 0.2s ease;
+}
+
+.pl-stage-item.active {
+  background: var(--color-accent-dim);
+  color: #fff;
+}
+
+.pl-stage-item.completed {
+  color: var(--color-text-secondary);
+}
+
+.pl-stage-item-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+}
+
+.pl-stage-item.active .pl-stage-item-num {
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+  border-color: var(--color-accent);
+}
+
+.pl-stage-item.completed .pl-stage-item-num {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.pl-stage-item-label {
+  flex: 1;
+  font-weight: 500;
+}
+
+.pl-stage-item-time {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+}
+
+/* Metric rows */
+.pl-sidebar-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.pl-sidebar-metric:last-child {
+  border-bottom: none;
+}
+
+.pl-sidebar-metric-label {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pl-sidebar-metric-value {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* GPU temp gauge (decorative) */
+.pl-gpu-gauge {
+  margin-top: 4px;
+}
+
+.pl-gpu-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.pl-gpu-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, var(--color-accent), #ef4444);
+  border-radius: var(--radius-full);
+  transition: width 1s ease;
+}
+
+.pl-gpu-label-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.pl-illustrative-tag {
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+/* ============================================================
+   11. LIVE TERMINAL LOG
+   ============================================================ */
+.pl-terminal {
+  padding: 0;
+  max-height: 180px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.pl-terminal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
+}
+
+.pl-terminal-title {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pl-terminal-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: plPulse 1.5s ease-in-out infinite;
+}
+
+.pl-terminal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.7;
+  color: var(--color-text-secondary);
+}
+
+.pl-log-line {
+  display: flex;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.pl-log-ts {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  min-width: 65px;
+}
+
+.pl-log-text {
+  color: var(--color-text-secondary);
+}
+
+.pl-log-line.success .pl-log-text {
+  color: #22c55e;
+}
+
+.pl-log-line.warn .pl-log-text {
+  color: var(--color-accent);
+}
+
+.pl-log-line.info .pl-log-text {
+  color: var(--color-text-secondary);
+}
+
+/* ============================================================
+   12. ANIMATIONS
+   ============================================================ */
+@keyframes plPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.4); }
+}
+
+@keyframes plFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes plScanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+.pl-fade-in {
+  animation: plFadeIn 0.4s ease forwards;
+}
+
+/* Stage complete checkmark animation */
+@keyframes plCheckPop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.pl-check-anim {
+  animation: plCheckPop 0.4s ease forwards;
+}
+
+/* Completion overlay */
+.pl-complete-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 10, 13, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 10;
+  animation: plFadeIn 0.5s ease forwards;
+}
+
+.pl-complete-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.12);
+  border: 2px solid rgba(34, 197, 94, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #22c55e;
+  font-size: 1.5rem;
+}
+
+.pl-complete-text {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pl-complete-sub {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+
+/* ============================================================
+   13. RESPONSIVE
+   ============================================================ */
+@media (max-width: 1100px) {
+  .pl-page {
+    grid-template-columns: 1fr;
+    padding: 16px 20px;
+  }
+  .pl-sidebar {
+    grid-column: 1;
+    grid-row: auto;
+    position: relative;
+    top: 0;
+    max-height: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .pl-sidebar-card {
+    flex: 1;
+    min-width: 200px;
+  }
+  .pl-depth-dual-pane {
+    grid-template-columns: 1fr;
+  }
+  .pl-geo-grid {
+    grid-template-columns: 1fr;
+  }
+}
