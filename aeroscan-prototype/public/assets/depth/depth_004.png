@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360">
+    <defs>
+      <linearGradient id="depthGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#050524" />
+        <stop offset="25%" stop-color="#1e1b4b" />
+        <stop offset="50%" stop-color="#0284c7" />
+        <stop offset="75%" stop-color="#22c55e" />
+        <stop offset="90%" stop-color="#eab308" />
+        <stop offset="100%" stop-color="#ef4444" />
+      </linearGradient>
+    </defs>
+    <rect width="640" height="360" fill="url(#depthGrad)" />
+    
+    <!-- Depth Contours for Collapsed Structures -->
+    <ellipse cx="230" cy="200" rx="140" ry="80" fill="none" stroke="#67e8f9" stroke-width="2" opacity="0.8"/>
+    <ellipse cx="230" cy="200" rx="90" ry="50" fill="none" stroke="#fde047" stroke-width="2.5" opacity="0.9"/>
+    <ellipse cx="230" cy="200" rx="40" ry="20" fill="none" stroke="#ef4444" stroke-width="3"/>
+
+    <rect x="360" y="150" width="150" height="120" fill="rgba(234,179,8,0.4)" stroke="#fde047" stroke-width="2"/>
+    <path d="M100 280 Q 250 195 550 290" stroke="#f43f5e" stroke-width="4" fill="none"/>
+
+    <!-- Depth Scale Legend -->
+    <rect x="20" y="320" width="200" height="16" rx="4" fill="url(#depthGrad)" stroke="#ffffff" stroke-width="1"/>
+    <text x="20" y="313" fill="#ffffff" font-family="monospace" font-size="10">NEAR (0.5m)</text>
+    <text x="160" y="313" fill="#ffffff" font-family="monospace" font-size="10">FAR (120m)</text>
+
+    <text x="460" y="30" fill="#67e8f9" font-family="monospace" font-size="11" font-weight="bold">COLMAP MVS DEPTH MAP</text>
+    <text x="460" y="45" fill="#ffffff" font-family="monospace" font-size="10">CONFIDENCE: 98.9%</text>
+    </svg>

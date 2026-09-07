@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360">
+    <rect width="640" height="360" fill="#0d1117" />
+    <!-- Terrain / Ruined ground -->
+    <polygon points="0,360 640,360 640,120 0,160" fill="#161b22" />
+    <polygon points="40,360 580,360 500,180 120,200" fill="#1c2128" />
+
+    <!-- Collapsed Structural Rubble / Damaged Buildings -->
+    <path d="M120 220 L180 150 L240 180 L290 140 L340 220 Z" fill="#2d333b" stroke="#444c56" stroke-width="2"/>
+    <path d="M140 200 L170 170 L210 190 Z" fill="#383e47" />
+
+    <!-- Debris / Fractures -->
+    <path d="M80 260 L140 280 L220 250 L310 290 L420 240 L520 275" stroke="#ef4444" stroke-width="2" stroke-dasharray="4,4" fill="none" />
+    <path d="M190 160 L210 240 L230 180 L280 230" stroke="#f59e0b" stroke-width="1.5" fill="none" />
+
+    <!-- Damaged Building Complex Block 2 -->
+    <rect x="360" y="160" width="140" height="110" fill="#21262d" stroke="#30363d" stroke-width="2" />
+    <polygon points="360,160 410,120 500,120 500,160" fill="#30363d" />
+    <!-- Impact fissure -->
+    <path d="M410 120 L440 170 L420 220 L470 270" stroke="#00d4ff" stroke-width="2" fill="none" />
+
+    <!-- Thermal / Emergency Target Markers -->
+    <circle cx="210" cy="190" r="18" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="3,3" />
+    <circle cx="210" cy="190" r="4" fill="#ef4444" />
+    <text x="235" y="195" fill="#ef4444" font-family="monospace" font-size="11" font-weight="bold">TARGET-01 [SURVIVOR DETECTED]</text>
+
+    <!-- Structural Damage Zone Overlay -->
+    <rect x="340" y="140" width="180" height="140" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6,4"/>
+    <text x="345" y="135" fill="#f59e0b" font-family="monospace" font-size="10" font-weight="bold">DAMAGE SECTOR A — CRITICAL</text>
+
+    <!-- HUD Overlay -->
+    <rect x="15" y="15" width="220" height="55" fill="rgba(13,17,23,0.85)" rx="6" stroke="#30363d"/>
+    <text x="25" y="32" fill="#00d4ff" font-family="monospace" font-size="11" font-weight="bold">DRONE-CAM #04 — DISASTER RESPONSE</text>
+    <text x="25" y="47" fill="#8b949e" font-family="monospace" font-size="10">GPS: 18.5204° N, 73.8567° E | ALT: 45.2m</text>
+
+    <text x="500" y="32" fill="#22c55e" font-family="monospace" font-size="11" font-weight="bold">● LIVE 4K STREAM</text>
+    <text x="500" y="47" fill="#8b949e" font-family="monospace" font-size="10">FRAME #00012</text>
+
+    <!-- Center Reticle -->
+    <line x1="300" y1="180" x2="340" y2="180" stroke="#00d4ff" stroke-width="1.5" opacity="0.6"/>
+    <line x1="320" y1="160" x2="320" y2="200" stroke="#00d4ff" stroke-width="1.5" opacity="0.6"/>
+    <circle cx="320" cy="180" r="30" fill="none" stroke="#00d4ff" stroke-width="1" opacity="0.4"/>
+    </svg>
